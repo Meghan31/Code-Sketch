@@ -1,0 +1,20 @@
+{
+	"name": "codesketch",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"start": "node backend/index.js",
+		"dev:server": "nodemon backend/index.js",
+		"dev:frontend": "cd frontend && npm run dev",
+		"dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+		"install:all": "npm install && cd frontend && npm install"
+	},
+	"dependencies": {
+		"express": "^4.21.2",
+		"socket.io": "^4.8.1"
+	},
+	"devDependencies": {
+		"concurrently": "^8.2.2",
+		"nodemon": "^3.1.10"
+	}
+}
