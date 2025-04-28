@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Navigate, useLocation } from 'react-router';
 import { useNavigate, useParams } from 'react-router-dom';
-import Client from '../../components/Clients.jsx';
+import Client from '../../components/client-circle/Clients.jsx';
 import CodeEditor from '../../components/editor/CodeEditor.jsx';
 import ACTIONS from '../../socket/actions.js';
 import { initSocket } from '../../socket/socket.js';

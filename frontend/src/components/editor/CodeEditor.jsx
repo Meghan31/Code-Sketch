@@ -1,13 +1,16 @@
 import Editor from '@monaco-editor/react';
 import PropTypes from 'prop-types';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ACTIONS from '../../socket/actions';
+
+import Output from '../output/Output';
 import './CodeEditor.scss';
 
 const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 	const [code, setCode] = useState('// Write your code here');
 	const [language, setLanguage] = useState('cpp');
-	const [output, setOutput] = useState('Run your code to see the output here');
+
+	const editorRef = useRef();
 	const [isExecuting, setIsExecuting] = useState(false);
 
 	useEffect(() => {
@@ -32,10 +35,10 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 			});
 
 			// Listen for code execution results
-			currentSocket.on(ACTIONS.EXECUTION_RESULT, ({ output }) => {
-				setOutput(output);
-				setIsExecuting(false);
-			});
+			// currentSocket.on(ACTIONS.EXECUTION_RESULT, ({  }) => {
+			// 	setOutput(output);
+			// 	setIsExecuting(false);
+			// });
 
 			// Listen for code sync when joining a room
 			currentSocket.on(ACTIONS.SYNC_CODE, ({ code, language }) => {
@@ -76,6 +79,11 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 		}
 	};
 
+	const onMount = (editor) => {
+		editorRef.current = editor;
+		editor.focus();
+	};
+
 	const handleLanguageChange = (e) => {
 		const newLanguage = e.target.value;
 		setLanguage(newLanguage);
@@ -91,7 +99,7 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 
 	const submitCode = () => {
 		setIsExecuting(true);
-		setOutput('Executing code...');
+		// setOutput('Executing code...');
 
 		// Emit code execution event
 		if (socketRef.current) {
@@ -128,6 +136,7 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 						language={language}
 						value={code}
 						onChange={handleCodeChange}
+						onMount={onMount}
 						theme="vs-dark"
 						options={{
 							minimap: { enabled: false },
@@ -140,12 +149,14 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 						}}
 					/>
 				</div>
-				<div className="output">
+				{/* <div className="output">
 					<p className="out-heading">Output</p>
 					<div className="output-box">
 						<p className="output-text">{output}</p>
 					</div>
-				</div>
+				</div> */}
+
+				<Output editorRef={editorRef} language={language} />
 			</div>
 		</div>
 	);

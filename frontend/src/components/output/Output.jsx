@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { executeCode } from '../api/api';
+import { executeCode } from '../../api/api';
 import './Output.scss';
 const Output = ({ editorRef, language }) => {
 	const [output, setOutput] = useState('');
