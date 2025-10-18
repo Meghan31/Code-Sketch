@@ -11,6 +11,13 @@ const Home = () => {
 	const [username, setUsername] = useState('');
 	const [isJoining, setIsJoining] = useState(false);
 
+	// ✅ ADDED: UUID validation helper
+	const isValidUUID = (uuid) => {
+		const uuidRegex =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		return uuidRegex.test(uuid);
+	};
+
 	// Create a new room with UUID
 	const createRoom = (e) => {
 		e.preventDefault();
@@ -32,9 +39,37 @@ const Home = () => {
 
 	// Join an existing room
 	const joinRoom = async () => {
-		// Validate inputs
+		// ✅ ADDED: Validate UUID format
 		if (!roomId || !username) {
 			toast.error('Room ID & username are required');
+			return;
+		}
+
+		// ✅ ADDED: Check if roomId is valid UUID
+		if (!isValidUUID(roomId)) {
+			toast.error(
+				'Invalid Room ID format. Please use a valid room ID or create a new room.'
+			);
+			return;
+		}
+
+		// ✅ ADDED: Validate username
+		if (username.length < 2) {
+			toast.error('Username must be at least 2 characters');
+			return;
+		}
+
+		if (username.length > 30) {
+			toast.error('Username cannot exceed 30 characters');
+			return;
+		}
+
+		// ✅ ADDED: Check username pattern (alphanumeric, spaces, underscores only)
+		const usernameRegex = /^[a-zA-Z0-9_\s]+$/;
+		if (!usernameRegex.test(username)) {
+			toast.error(
+				'Username can only contain letters, numbers, spaces, and underscores'
+			);
 			return;
 		}
 
@@ -118,7 +153,7 @@ const Home = () => {
 				</div>
 				<div className="createRoom">
 					<p>
-						Don&apos;t have a room ID?{' Click here  '}
+						Don&apos;t have a room ID?{' '}
 						<a
 							onClick={createRoom}
 							style={{
@@ -136,10 +171,14 @@ const Home = () => {
 				<p style={{ color: 'whitesmoke' }}>
 					Developed by{'   '}
 					<a
-						href="https://www.meghan31.live"
+						href="https://www.meghan31.me"
 						target="_blank"
 						rel="noreferrer"
-						style={{ color: 'grey', fontWeight: 'bolder', fontSize: '1.2rem' }}
+						style={{
+							color: 'grey',
+							fontWeight: 'bolder',
+							fontSize: '1.2rem',
+						}}
 					>
 						Meghan31
 					</a>

@@ -16,7 +16,20 @@ const EditorPage = () => {
 	const reactNavigator = useNavigate();
 	const [clients, setClients] = useState([]);
 
+	// ✅ UUID validation helper
+	const isValidUUID = (uuid) => {
+		const uuidRegex =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		return uuidRegex.test(uuid);
+	};
+
+	// ✅ useEffect MUST come before any conditional returns
 	useEffect(() => {
+		// Only initialize if we have valid data
+		if (!isValidUUID(roomId) || !location.state) {
+			return; // Exit early from effect, not component
+		}
+
 		const init = async () => {
 			// Initialize socket connection
 			socketRef.current = initSocket();
@@ -71,7 +84,7 @@ const EditorPage = () => {
 				socketRef.current.off(ACTIONS.LEFT);
 			}
 		};
-	}, [location.state?.username, reactNavigator, roomId]);
+	}, [location.state?.username, reactNavigator, roomId, location.state]);
 
 	// Copy room ID to clipboard
 	async function copyRoomId() {
@@ -87,6 +100,13 @@ const EditorPage = () => {
 	// Leave the room and navigate to home
 	function leaveRoom() {
 		reactNavigator('/');
+	}
+
+	// ✅ NOW do conditional rendering AFTER all hooks
+	// Check if roomId is valid UUID
+	if (!isValidUUID(roomId)) {
+		toast.error('Invalid Room ID format. Redirecting to home...');
+		return <Navigate to="/" />;
 	}
 
 	// If no location state (direct URL access), redirect to home
@@ -140,7 +160,7 @@ const EditorPage = () => {
 				<p>
 					Developed by{' '}
 					<a
-						href="https://meghan31.live"
+						href="https://meghan31.me"
 						target="_blank"
 						rel="noreferrer"
 						style={{
