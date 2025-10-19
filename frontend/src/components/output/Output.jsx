@@ -3,29 +3,62 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { executeCode } from '../../api/api';
 import './Output.scss';
+
 const Output = ({ editorRef, language }) => {
 	const [output, setOutput] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isError, setIsError] = useState(false);
-	const [stdin, setStdin] = useState(''); // State for user input
+	const [stdin, setStdin] = useState('');
 
 	const runCode = async () => {
-		console.log('Running code');
-		const sourceCode = editorRef.current.getValue();
-		if (!sourceCode) {
-			console.log('No code to run');
+		const sourceCode = editorRef.current?.getValue();
+
+		if (!sourceCode || sourceCode.trim() === '') {
+			toast.error('No code to run');
 			return;
 		}
+
+		// Validate stdin size
+		if (stdin.length > 10000) {
+			toast.error('Input is too large (max 10KB)');
+			return;
+		}
+
 		try {
 			setIsLoading(true);
-			const { run: result } = await executeCode(sourceCode, language, stdin);
-			setOutput(result.output);
-			result.stderr ? setIsError(true) : setIsError(false);
+			setIsError(false);
+			setOutput('');
 
-			console.log('Code running');
+			const { run: result } = await executeCode(sourceCode, language, stdin);
+
+			const outputText = result.output || result.stderr || 'No output';
+			setOutput(outputText);
+			setIsError(!!result.stderr);
+
+			if (result.stderr) {
+				toast.error('Code execution completed with errors');
+			}
 		} catch (error) {
-			console.log(error);
-			toast.error('Error running code', { duration: 3000 });
+			console.error('Execution error:', error);
+			setIsError(true);
+
+			// Better error messages
+			if (error.response?.status === 429) {
+				setOutput('Rate limit exceeded. Please wait before running again.');
+				toast.error('Too many requests. Please wait.');
+			} else if (error.response?.status === 400) {
+				setOutput('Invalid code or input. Please check your code.');
+				toast.error('Invalid request');
+			} else if (error.code === 'ECONNABORTED') {
+				setOutput('Request timeout. The code took too long to execute.');
+				toast.error('Execution timeout');
+			} else if (!error.response) {
+				setOutput('Network error. Please check your connection.');
+				toast.error('Network error');
+			} else {
+				setOutput('Error running code. Please try again.');
+				toast.error('Error running code');
+			}
 		} finally {
 			setIsLoading(false);
 		}
@@ -35,39 +68,54 @@ const Output = ({ editorRef, language }) => {
 		<div className="output">
 			<div className="head-block">
 				<p className="out-heading">Output</p>
-				<button className="run-btn" onClick={runCode}>
+				<button className="run-btn" onClick={runCode} disabled={isLoading}>
 					{isLoading ? 'Running...' : 'Run'}
 				</button>
 			</div>
 			<div className="input-box">
 				<textarea
-					placeholder="Enter input for the program"
+					placeholder="Enter input for the program (optional)"
 					value={stdin}
 					onChange={(e) => setStdin(e.target.value)}
-					rows="5"
-					cols="40"
+					disabled={isLoading}
+					maxLength={10000}
 					style={{
 						height: '10vh',
 						width: '99%',
 						marginBottom: '10px',
-						// padding: '3px',
-						overflowY: 'scroll',
+						overflowY: 'auto',
 						resize: 'none',
+						padding: '8px',
+						fontFamily: 'monospace',
+						fontSize: '14px',
+						border: '1px solid #444',
+						borderRadius: '4px',
+						backgroundColor: '#d4d4d4',
+						color: '#000000',
 					}}
 				/>
 			</div>
 			<div className="output-box">
-				<div>
-					<div className="output">
-						<pre
-							style={{
-								color: isError ? 'red' : 'white',
-							}}
-						>
-							{output}
-						</pre>
-					</div>
-				</div>
+				<pre
+					style={{
+						color: isError ? '#f48771' : '#35b723ff',
+						backgroundColor: !isError ? '#1e1e1e' : '#1e1e1e',
+						whiteSpace: 'pre-wrap',
+						wordBreak: 'break-word',
+						maxHeight: '200px',
+						overflowY: 'auto',
+						margin: 0,
+						padding: '10px',
+						fontFamily: 'monospace',
+						fontSize: '14px',
+						border: '1px solid #444',
+						borderRadius: '20px',
+						minHeight: '100px',
+					}}
+				>
+					{output ||
+						(isLoading ? 'Running code...' : 'Run your code to see output')}
+				</pre>
 			</div>
 		</div>
 	);

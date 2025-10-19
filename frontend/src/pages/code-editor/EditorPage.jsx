@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Navigate, useLocation } from 'react-router';
-import { useNavigate, useParams } from 'react-router-dom';
+import {
+	Navigate,
+	useLocation,
+	useNavigate,
+	useParams,
+} from 'react-router-dom';
 import Client from '../../components/client-circle/Clients.jsx';
 import CodeEditor from '../../components/editor/CodeEditor.jsx';
 import ACTIONS from '../../socket/actions.js';
@@ -13,78 +17,83 @@ const EditorPage = () => {
 	const codeRef = useRef(null);
 	const location = useLocation();
 	const { roomId } = useParams();
-	const reactNavigator = useNavigate();
+	const navigate = useNavigate();
 	const [clients, setClients] = useState([]);
 
-	// ✅ UUID validation helper
+	// UUID validation helper
 	const isValidUUID = (uuid) => {
 		const uuidRegex =
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 		return uuidRegex.test(uuid);
 	};
 
-	// ✅ useEffect MUST come before any conditional returns
+	// Validate before running hooks
+	const username = location.state?.username;
+	const hasValidState = !!username;
+	const hasValidRoomId = isValidUUID(roomId);
+
 	useEffect(() => {
-		// Only initialize if we have valid data
-		if (!isValidUUID(roomId) || !location.state) {
-			return; // Exit early from effect, not component
+		// Only run if validation passes
+		if (!hasValidRoomId || !hasValidState) {
+			return;
 		}
 
 		const init = async () => {
 			// Initialize socket connection
 			socketRef.current = initSocket();
 
-			// Handle socket connection errors
-			socketRef.current.on('connect_error', (err) => handleErrors(err));
-			socketRef.current.on('connect_failed', (err) => handleErrors(err));
-
-			function handleErrors(e) {
-				console.log('socket error', e);
+			// Define error handler
+			const handleErrors = (e) => {
+				console.error('Socket error:', e);
 				toast.error('Socket connection failed, try again later.');
-				reactNavigator('/');
-			}
+				navigate('/');
+			};
+
+			// Register error listeners
+			socketRef.current.on('connect_error', handleErrors);
+			socketRef.current.on('connect_failed', handleErrors);
 
 			// Join the room
 			socketRef.current.emit(ACTIONS.JOIN, {
 				roomId,
-				username: location.state?.username,
+				username: username,
 			});
 
 			// Handle user joined event
-			socketRef.current.on(
-				ACTIONS.JOINED,
-				({ clients, username, socketId }) => {
-					// Only show toast for other users joining
-					if (username !== location.state?.username) {
-						toast.success(`${username} joined the room.`);
-						console.log(`${username} joined`);
-						console.log(socketId);
-					}
-
-					setClients(clients);
+			const handleUserJoined = ({ clients, username: joinedUser }) => {
+				// Only show toast for other users joining
+				if (joinedUser !== username) {
+					toast.success(`${joinedUser} joined the room.`);
 				}
-			);
+				setClients(clients);
+			};
 
 			// Handle user left event
-			socketRef.current.on(ACTIONS.LEFT, ({ socketId, username }) => {
-				toast.success(`${username} left the room.`);
+			const handleUserLeft = ({ socketId, username: leftUser }) => {
+				toast.success(`${leftUser} left the room.`);
 				setClients((prev) =>
 					prev.filter((client) => client.socketId !== socketId)
 				);
-			});
+			};
+
+			socketRef.current.on(ACTIONS.JOINED, handleUserJoined);
+			socketRef.current.on(ACTIONS.LEFT, handleUserLeft);
 		};
 
 		init();
 
-		// Clean up on component unmount
+		// Cleanup function
 		return () => {
 			if (socketRef.current) {
-				socketRef.current.disconnect();
 				socketRef.current.off(ACTIONS.JOINED);
 				socketRef.current.off(ACTIONS.LEFT);
+				socketRef.current.off('connect_error');
+				socketRef.current.off('connect_failed');
+				socketRef.current.disconnect();
+				socketRef.current = null;
 			}
 		};
-	}, [location.state?.username, reactNavigator, roomId, location.state]);
+	}, [hasValidRoomId, hasValidState, roomId, username, navigate]);
 
 	// Copy room ID to clipboard
 	async function copyRoomId() {
@@ -99,19 +108,12 @@ const EditorPage = () => {
 
 	// Leave the room and navigate to home
 	function leaveRoom() {
-		reactNavigator('/');
+		navigate('/');
 	}
 
-	// ✅ NOW do conditional rendering AFTER all hooks
-	// Check if roomId is valid UUID
-	if (!isValidUUID(roomId)) {
-		toast.error('Invalid Room ID format. Redirecting to home...');
-		return <Navigate to="/" />;
-	}
-
-	// If no location state (direct URL access), redirect to home
-	if (!location.state) {
-		return <Navigate to="/" />;
+	// Validation check - redirect if invalid
+	if (!hasValidRoomId || !hasValidState) {
+		return <Navigate to="/" replace />;
 	}
 
 	return (
@@ -139,6 +141,23 @@ const EditorPage = () => {
 						<div className="buttons">
 							<button onClick={copyRoomId}>Copy Room ID</button>
 							<button onClick={leaveRoom}>Leave</button>
+							<div className="footer">
+								<p>
+									Developed by{' '}
+									<a
+										href="https://meghan31.me"
+										target="_blank"
+										rel="noreferrer"
+										style={{
+											color: 'black',
+											fontWeight: 'bold',
+											textDecoration: 'none',
+										}}
+									>
+										Meghan31
+									</a>
+								</p>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -155,23 +174,6 @@ const EditorPage = () => {
 						}}
 					/>
 				</div>
-			</div>
-			<div className="footer">
-				<p>
-					Developed by{' '}
-					<a
-						href="https://meghan31.me"
-						target="_blank"
-						rel="noreferrer"
-						style={{
-							color: 'black',
-							fontWeight: 'bold',
-							textDecoration: 'none',
-						}}
-					>
-						Meghan31
-					</a>
-				</p>
 			</div>
 		</div>
 	);

@@ -10,7 +10,7 @@ import { roomManager } from './utils/roomManager.js';
 const app = express();
 const server = http.createServer(app);
 
-// ✅ FIXED: Whitelist CORS origins
+//Whitelist CORS origins
 const allowedOrigins = process.env.CORS_ORIGINS
 	? process.env.CORS_ORIGINS.split(',')
 	: ['http://localhost:5173', 'http://localhost:3000'];
@@ -25,7 +25,7 @@ const io = new Server(server, {
 	pingTimeout: 60000,
 });
 
-// ✅ FIXED: Separate rate limiters for different operations
+//Separate rate limiters for different operations
 const rateLimiters = {
 	join: new RateLimiterMemory({
 		points: 10, // 10 room joins per minute
@@ -45,7 +45,7 @@ const rateLimiters = {
 	}),
 };
 
-// ✅ FIXED: Helper function to get client identifier (handles proxies)
+//Helper function to get client identifier (handles proxies)
 const getClientIdentifier = (socket) => {
 	return (
 		socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -98,7 +98,7 @@ io.on('connection', (socket) => {
 	let currentRoom = null;
 	let currentUser = null;
 
-	// ✅ FIXED: Join with validation, rate limiting, and error handling
+	//Join with validation, rate limiting, and error handling
 	socket.on('join', async (data) => {
 		try {
 			// Rate limiting with proper client identifier
@@ -149,7 +149,7 @@ io.on('connection', (socket) => {
 		}
 	});
 
-	// ✅ FIXED: Code change with proper rate limiting (no sanitization)
+	//Code change with proper rate limiting (no sanitization)
 	socket.on('codeChange', async (data) => {
 		try {
 			// Use codeChange rate limiter (allows fast typing)
@@ -166,7 +166,7 @@ io.on('connection', (socket) => {
 		}
 	});
 
-	// ✅ FIXED: Language change with proper rate limiting
+	//Language change with proper rate limiting
 	socket.on('languageChange', async (data) => {
 		try {
 			await rateLimiters.languageChange.consume(getClientIdentifier(socket));
@@ -182,7 +182,7 @@ io.on('connection', (socket) => {
 		}
 	});
 
-	// ✅ FIXED: Execute code with proper rate limiting
+	//Execute code with proper rate limiting
 	socket.on('executeCode', async (data) => {
 		try {
 			await rateLimiters.executeCode.consume(getClientIdentifier(socket));

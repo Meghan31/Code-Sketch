@@ -8,7 +8,7 @@ export const handleSocketError = (socket, error, event) => {
 		event,
 	});
 
-	// ← ADDED: Sanitize error messages in production
+	// Sanitize error messages in production
 	const isProduction = process.env.NODE_ENV === 'production';
 	const userMessage = isProduction
 		? getSafeErrorMessage(error)
@@ -22,7 +22,7 @@ export const handleSocketError = (socket, error, event) => {
 	});
 };
 
-// ← ADDED: Helper to provide safe error messages
+// Helper to provide safe error messages
 const getSafeErrorMessage = (error) => {
 	const message = error.message || '';
 

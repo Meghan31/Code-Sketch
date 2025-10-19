@@ -11,7 +11,7 @@ const Home = () => {
 	const [username, setUsername] = useState('');
 	const [isJoining, setIsJoining] = useState(false);
 
-	// ✅ ADDED: UUID validation helper
+	// UUID validation helper
 	const isValidUUID = (uuid) => {
 		const uuidRegex =
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,39 +34,42 @@ const Home = () => {
 				console.error('Failed to copy text: ', err);
 				toast.error('Room ID created but could not copy to clipboard');
 			});
-		console.log(`Created room with ID: ${id}`);
 	};
 
 	// Join an existing room
 	const joinRoom = async () => {
-		// ✅ ADDED: Validate UUID format
+		// Validate inputs
 		if (!roomId || !username) {
 			toast.error('Room ID & username are required');
 			return;
 		}
 
-		// ✅ ADDED: Check if roomId is valid UUID
-		if (!isValidUUID(roomId)) {
+		// Trim whitespace
+		const trimmedRoomId = roomId.trim();
+		const trimmedUsername = username.trim();
+
+		// Check if roomId is valid UUID
+		if (!isValidUUID(trimmedRoomId)) {
 			toast.error(
 				'Invalid Room ID format. Please use a valid room ID or create a new room.'
 			);
 			return;
 		}
 
-		// ✅ ADDED: Validate username
-		if (username.length < 2) {
+		// Validate username
+		if (trimmedUsername.length < 2) {
 			toast.error('Username must be at least 2 characters');
 			return;
 		}
 
-		if (username.length > 30) {
+		if (trimmedUsername.length > 30) {
 			toast.error('Username cannot exceed 30 characters');
 			return;
 		}
 
-		// ✅ ADDED: Check username pattern (alphanumeric, spaces, underscores only)
+		// Check username pattern (alphanumeric, spaces, underscores only)
 		const usernameRegex = /^[a-zA-Z0-9_\s]+$/;
-		if (!usernameRegex.test(username)) {
+		if (!usernameRegex.test(trimmedUsername)) {
 			toast.error(
 				'Username can only contain letters, numbers, spaces, and underscores'
 			);
@@ -78,35 +81,52 @@ const Home = () => {
 
 		setIsJoining(true);
 
+		let socket = null;
+
 		try {
 			// Try to initialize a socket connection to verify server is reachable
-			const socket = initSocket();
+			socket = initSocket();
 
-			// Wait for connection or timeout after 3 seconds
+			// Wait for connection or timeout after 5 seconds
 			const connectionPromise = new Promise((resolve, reject) => {
-				socket.on('connect', resolve);
-				socket.on('connect_error', reject);
-				socket.on('connect_timeout', reject);
+				const timeout = setTimeout(() => {
+					reject(new Error('Connection timeout'));
+				}, 5000);
 
-				// Timeout after 3 seconds
-				setTimeout(() => reject(new Error('Connection timeout')), 3000);
+				socket.on('connect', () => {
+					clearTimeout(timeout);
+					resolve();
+				});
+
+				socket.on('connect_error', (error) => {
+					clearTimeout(timeout);
+					reject(error);
+				});
+
+				socket.on('connect_timeout', () => {
+					clearTimeout(timeout);
+					reject(new Error('Connection timeout'));
+				});
 			});
 
 			await connectionPromise;
 
 			// If we reach here, connection was successful
-			socket.disconnect(); // Disconnect this test socket, we'll reconnect in EditorPage
-
-			// Redirect to editor page
-			navigate(`/editor/${roomId}`, {
+			// Navigate to editor page
+			navigate(`/editor/${trimmedRoomId}`, {
 				state: {
-					username,
+					username: trimmedUsername,
 				},
 			});
 		} catch (error) {
 			console.error('Connection error:', error);
 			toast.error('Could not connect to server. Please try again later.');
 		} finally {
+			// ALWAYS disconnect and cleanup the test socket
+			if (socket) {
+				socket.removeAllListeners();
+				socket.disconnect();
+			}
 			setIsJoining(false);
 		}
 	};

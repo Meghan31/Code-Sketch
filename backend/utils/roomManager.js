@@ -6,16 +6,16 @@ class RoomManager {
 		this.roomActivity = new Map();
 		this.ROOM_TTL = 3600000; // 1 hour in milliseconds
 		this.CLEANUP_INTERVAL = 300000; // 5 minutes
-		this.cleanupIntervalId = null; // ← ADDED: Store interval ID
-		this.MAX_ROOMS = 1000; // ← ADDED: Prevent memory exhaustion
-		this.MAX_CLIENTS_PER_ROOM = 50; // ← ADDED: Limit clients per room
+		this.cleanupIntervalId = null; //    Store interval ID
+		this.MAX_ROOMS = 1000; //    Prevent memory exhaustion
+		this.MAX_CLIENTS_PER_ROOM = 50; //    Limit clients per room
 
 		this.startCleanupInterval();
 	}
 
 	getOrCreateRoom(roomId) {
 		if (!this.rooms.has(roomId)) {
-			// ← ADDED: Check max rooms limit
+			//  Check max rooms limit
 			if (this.rooms.size >= this.MAX_ROOMS) {
 				throw new Error(`Maximum number of rooms (${this.MAX_ROOMS}) reached`);
 			}
@@ -39,7 +39,7 @@ class RoomManager {
 	addClient(roomId, socketId, username) {
 		const room = this.getOrCreateRoom(roomId);
 
-		// ← ADDED: Check max clients limit
+		//  Check max clients limit
 		if (room.clients.size >= this.MAX_CLIENTS_PER_ROOM) {
 			throw new Error(
 				`Room is full (max ${this.MAX_CLIENTS_PER_ROOM} clients)`
@@ -121,7 +121,7 @@ class RoomManager {
 	}
 
 	startCleanupInterval() {
-		// ← FIXED: Store interval ID
+		//  Store interval ID
 		this.cleanupIntervalId = setInterval(() => {
 			this.cleanupInactiveRooms();
 		}, this.CLEANUP_INTERVAL);
@@ -142,7 +142,7 @@ class RoomManager {
 	async shutdown() {
 		logger.info('RoomManager shutting down...');
 
-		// ← FIXED: Clear the interval
+		// Clear the interval
 		if (this.cleanupIntervalId) {
 			clearInterval(this.cleanupIntervalId);
 			this.cleanupIntervalId = null;
