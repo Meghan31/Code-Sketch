@@ -259,10 +259,11 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start server
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
 
-server.listen(port, () => {
-	logger.info(`🚀 Server running on port ${port}`);
-	logger.info(`📊 Health check: http://localhost:${port}/health`);
-	logger.info(`📈 Metrics: http://localhost:${port}/metrics`);
+server.listen(port, host, () => {
+	logger.info(`🚀 Server running on ${host}:${port}`);
+	logger.info(`📊 Health check: http://${host}:${port}/health`);
+	logger.info(`📈 Metrics: http://${host}:${port}/metrics`);
 	logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
