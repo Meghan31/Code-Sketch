@@ -1,4 +1,3 @@
-// Socket action types for consistent messaging between client and server
 const ACTIONS = {
 	JOIN: 'join',
 	JOINED: 'userJoined',
@@ -11,6 +10,8 @@ const ACTIONS = {
 	LANGUAGE_CHANGED: 'languageChanged',
 	EXECUTE_CODE: 'executeCode',
 	EXECUTION_RESULT: 'executionResult',
+	INPUT_CHANGE: 'inputChange',
+	INPUT_CHANGED: 'inputChanged',
 	DISCONNECTED: 'disconnect',
 	ERROR: 'error',
 };

@@ -6,16 +6,15 @@ class RoomManager {
 		this.roomActivity = new Map();
 		this.ROOM_TTL = 3600000; // 1 hour in milliseconds
 		this.CLEANUP_INTERVAL = 300000; // 5 minutes
-		this.cleanupIntervalId = null; //    Store interval ID
-		this.MAX_ROOMS = 1000; //    Prevent memory exhaustion
-		this.MAX_CLIENTS_PER_ROOM = 50; //    Limit clients per room
+		this.cleanupIntervalId = null;
+		this.MAX_ROOMS = 1000;
+		this.MAX_CLIENTS_PER_ROOM = 50;
 
 		this.startCleanupInterval();
 	}
 
 	getOrCreateRoom(roomId) {
 		if (!this.rooms.has(roomId)) {
-			//  Check max rooms limit
 			if (this.rooms.size >= this.MAX_ROOMS) {
 				throw new Error(`Maximum number of rooms (${this.MAX_ROOMS}) reached`);
 			}
@@ -24,6 +23,9 @@ class RoomManager {
 				clients: new Map(),
 				code: '',
 				language: 'cpp',
+				stdin: '', // Add stdin storage
+				output: '', // Add output storage
+				isError: false, // Add error state
 				createdAt: Date.now(),
 			});
 			this.updateActivity(roomId);
@@ -39,7 +41,6 @@ class RoomManager {
 	addClient(roomId, socketId, username) {
 		const room = this.getOrCreateRoom(roomId);
 
-		//  Check max clients limit
 		if (room.clients.size >= this.MAX_CLIENTS_PER_ROOM) {
 			throw new Error(
 				`Room is full (max ${this.MAX_CLIENTS_PER_ROOM} clients)`
@@ -86,6 +87,23 @@ class RoomManager {
 		}
 	}
 
+	updateInput(roomId, stdin) {
+		const room = this.rooms.get(roomId);
+		if (room) {
+			room.stdin = stdin;
+			this.updateActivity(roomId);
+		}
+	}
+
+	updateOutput(roomId, output, isError = false) {
+		const room = this.rooms.get(roomId);
+		if (room) {
+			room.output = output;
+			room.isError = isError;
+			this.updateActivity(roomId);
+		}
+	}
+
 	getClients(roomId) {
 		const room = this.rooms.get(roomId);
 		if (!room) return [];
@@ -121,7 +139,6 @@ class RoomManager {
 	}
 
 	startCleanupInterval() {
-		//  Store interval ID
 		this.cleanupIntervalId = setInterval(() => {
 			this.cleanupInactiveRooms();
 		}, this.CLEANUP_INTERVAL);
@@ -142,7 +159,6 @@ class RoomManager {
 	async shutdown() {
 		logger.info('RoomManager shutting down...');
 
-		// Clear the interval
 		if (this.cleanupIntervalId) {
 			clearInterval(this.cleanupIntervalId);
 			this.cleanupIntervalId = null;

@@ -1,14 +1,85 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { executeCode } from '../../api/api';
+import ACTIONS from '../../socket/actions';
 import './Output.scss';
 
-const Output = ({ editorRef, language }) => {
+const Output = ({ editorRef, language, socketRef, roomId }) => {
 	const [output, setOutput] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isError, setIsError] = useState(false);
 	const [stdin, setStdin] = useState('');
+
+	// Listen for socket events
+	useEffect(() => {
+		const currentSocket = socketRef.current;
+		if (!currentSocket) return;
+
+		// Handle input changes from other users
+		const handleInputChanged = ({ stdin: newStdin }) => {
+			if (newStdin !== stdin) {
+				setStdin(newStdin);
+			}
+		};
+
+		// Handle execution started by other users
+		const handleExecutionStarted = ({ username }) => {
+			setIsLoading(true);
+			setOutput('');
+			toast.success(`${username} is running the code...`);
+		};
+
+		// Handle execution results from other users
+		const handleExecutionResult = ({ output: newOutput, isError: newIsError, username }) => {
+			setOutput(newOutput);
+			setIsError(newIsError);
+			setIsLoading(false);
+
+			if (newIsError) {
+				toast.error(`Code executed by ${username} with errors`);
+			} else {
+				toast.success(`Code executed successfully by ${username}`);
+			}
+		};
+
+		// Handle sync when joining
+		const handleSyncCode = ({ stdin: syncedStdin, output: syncedOutput, isError: syncedIsError }) => {
+			if (syncedStdin !== undefined) {
+				setStdin(syncedStdin);
+			}
+			if (syncedOutput !== undefined) {
+				setOutput(syncedOutput);
+				setIsError(syncedIsError || false);
+			}
+		};
+
+		currentSocket.on(ACTIONS.INPUT_CHANGED, handleInputChanged);
+		currentSocket.on('executionStarted', handleExecutionStarted);
+		currentSocket.on(ACTIONS.EXECUTION_RESULT, handleExecutionResult);
+		currentSocket.on(ACTIONS.SYNC_CODE, handleSyncCode);
+
+		return () => {
+			currentSocket.off(ACTIONS.INPUT_CHANGED, handleInputChanged);
+			currentSocket.off('executionStarted', handleExecutionStarted);
+			currentSocket.off(ACTIONS.EXECUTION_RESULT, handleExecutionResult);
+			currentSocket.off(ACTIONS.SYNC_CODE, handleSyncCode);
+		};
+	}, [socketRef, stdin]);
+
+	// Handle input changes
+	const handleInputChange = (e) => {
+		const newStdin = e.target.value;
+		setStdin(newStdin);
+
+		// Emit input change to other users
+		if (socketRef.current) {
+			socketRef.current.emit(ACTIONS.INPUT_CHANGE, {
+				roomId,
+				stdin: newStdin,
+			});
+		}
+	};
 
 	const runCode = async () => {
 		const sourceCode = editorRef.current?.getValue();
@@ -29,35 +100,71 @@ const Output = ({ editorRef, language }) => {
 			setIsError(false);
 			setOutput('');
 
+			// Emit execution started to all users
+			if (socketRef.current) {
+				socketRef.current.emit(ACTIONS.EXECUTE_CODE, {
+					roomId,
+					code: sourceCode,
+					language,
+					stdin,
+				});
+			}
+
+			// Execute code via API
 			const { run: result } = await executeCode(sourceCode, language, stdin);
 
 			const outputText = result.output || result.stderr || 'No output';
-			setOutput(outputText);
-			setIsError(!!result.stderr);
+			const hasError = !!result.stderr;
 
-			if (result.stderr) {
+			setOutput(outputText);
+			setIsError(hasError);
+
+			// Broadcast result to all users
+			if (socketRef.current) {
+				socketRef.current.emit('executionResult', {
+					roomId,
+					output: outputText,
+					isError: hasError,
+				});
+			}
+
+			if (hasError) {
 				toast.error('Code execution completed with errors');
+			} else {
+				toast.success('Code executed successfully');
 			}
 		} catch (error) {
 			console.error('Execution error:', error);
 			setIsError(true);
 
+			let errorMessage = 'Error running code. Please try again.';
+
 			// Better error messages
 			if (error.response?.status === 429) {
-				setOutput('Rate limit exceeded. Please wait before running again.');
+				errorMessage = 'Rate limit exceeded. Please wait before running again.';
 				toast.error('Too many requests. Please wait.');
 			} else if (error.response?.status === 400) {
-				setOutput('Invalid code or input. Please check your code.');
+				errorMessage = 'Invalid code or input. Please check your code.';
 				toast.error('Invalid request');
 			} else if (error.code === 'ECONNABORTED') {
-				setOutput('Request timeout. The code took too long to execute.');
+				errorMessage = 'Request timeout. The code took too long to execute.';
 				toast.error('Execution timeout');
 			} else if (!error.response) {
-				setOutput('Network error. Please check your connection.');
+				errorMessage = 'Network error. Please check your connection.';
 				toast.error('Network error');
 			} else {
-				setOutput('Error running code. Please try again.');
 				toast.error('Error running code');
+			}
+
+			setOutput(errorMessage);
+
+			// Broadcast error to all users
+			if (socketRef.current) {
+				socketRef.current.emit('executionResult', {
+					roomId,
+					output: errorMessage,
+					isError: true,
+				});
 			}
 		} finally {
 			setIsLoading(false);
@@ -76,7 +183,7 @@ const Output = ({ editorRef, language }) => {
 				<textarea
 					placeholder="Enter input for the program (optional)"
 					value={stdin}
-					onChange={(e) => setStdin(e.target.value)}
+					onChange={handleInputChange}
 					disabled={isLoading}
 					maxLength={10000}
 					style={{
@@ -124,6 +231,10 @@ const Output = ({ editorRef, language }) => {
 Output.propTypes = {
 	editorRef: PropTypes.object.isRequired,
 	language: PropTypes.string.isRequired,
+	socketRef: PropTypes.shape({
+		current: PropTypes.object,
+	}).isRequired,
+	roomId: PropTypes.string.isRequired,
 };
 
 export default Output;

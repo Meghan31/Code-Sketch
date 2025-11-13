@@ -24,7 +24,7 @@ export const schemas = {
 	codeChange: Joi.object({
 		roomId: Joi.string().uuid().required(),
 		code: Joi.string()
-			.max(100000) // 100KB limit
+			.max(100000)
 			.allow('')
 			.required()
 			.messages({
@@ -48,6 +48,12 @@ export const schemas = {
 		language: Joi.string()
 			.valid('cpp', 'c', 'javascript', 'java', 'python')
 			.required(),
+		stdin: Joi.string().max(10000).allow('').optional(),
+	}),
+
+	inputChange: Joi.object({
+		roomId: Joi.string().uuid().required(),
+		stdin: Joi.string().max(10000).allow('').required(),
 	}),
 };
 

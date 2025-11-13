@@ -53,14 +53,21 @@ const EditorPage = () => {
 			socketRef.current.on('connect_error', handleErrors);
 			socketRef.current.on('connect_failed', handleErrors);
 
-			// Join the room
-			socketRef.current.emit(ACTIONS.JOIN, {
-				roomId,
-				username: username,
+			// Wait for connection before joining
+			socketRef.current.on('connect', () => {
+				console.log('Socket connected, joining room...');
+				
+				// Join the room
+				socketRef.current.emit(ACTIONS.JOIN, {
+					roomId,
+					username: username,
+				});
 			});
 
 			// Handle user joined event
 			const handleUserJoined = ({ clients, username: joinedUser }) => {
+				console.log('User joined:', joinedUser, 'Total clients:', clients.length);
+				
 				// Only show toast for other users joining
 				if (joinedUser !== username) {
 					toast.success(`${joinedUser} joined the room.`);
@@ -70,6 +77,7 @@ const EditorPage = () => {
 
 			// Handle user left event
 			const handleUserLeft = ({ socketId, username: leftUser }) => {
+				console.log('User left:', leftUser);
 				toast.success(`${leftUser} left the room.`);
 				setClients((prev) =>
 					prev.filter((client) => client.socketId !== socketId)
@@ -85,8 +93,10 @@ const EditorPage = () => {
 		// Cleanup function
 		return () => {
 			if (socketRef.current) {
+				console.log('Cleaning up socket connection...');
 				socketRef.current.off(ACTIONS.JOINED);
 				socketRef.current.off(ACTIONS.LEFT);
+				socketRef.current.off('connect');
 				socketRef.current.off('connect_error');
 				socketRef.current.off('connect_failed');
 				socketRef.current.disconnect();
@@ -169,6 +179,7 @@ const EditorPage = () => {
 					<CodeEditor
 						socketRef={socketRef}
 						roomId={roomId}
+						username={username}
 						onCodeChange={(code) => {
 							codeRef.current = code;
 						}}
