@@ -1,7 +1,10 @@
+import 'dotenv/config';
+import cors from 'cors';
 import express from 'express';
 import http from 'http';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { Server } from 'socket.io';
+import { verifyAuth } from './middleware/auth.js';
 import { handleSocketError } from './middleware/errorHandler.js';
 import { schemas, validate } from './middleware/validation.js';
 import { logger } from './utils/logger.js';
@@ -13,6 +16,9 @@ const server = http.createServer(app);
 const allowedOrigins = process.env.CORS_ORIGINS
 	? process.env.CORS_ORIGINS.split(',')
 	: ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json());
 
 const io = new Server(server, {
 	cors: {
@@ -54,6 +60,12 @@ const getClientIdentifier = (socket) => {
 	);
 };
 
+app.get('/room/:roomId/exists', (req, res) => {
+	const { roomId } = req.params;
+	const exists = roomManager.roomExists(roomId);
+	res.json({ exists });
+});
+
 app.get('/health', (req, res) => {
 	const stats = roomManager.getStats();
 	res.json({
@@ -88,6 +100,8 @@ codesketch_uptime_seconds ${Math.floor(process.uptime())}
 	`.trim()
 	);
 });
+
+io.use(verifyAuth);
 
 io.on('connection', (socket) => {
 	logger.info(`[Socket] Client connected: ${socket.id}`);
@@ -126,7 +140,13 @@ io.on('connection', (socket) => {
 			);
 			socket.join(roomId);
 
-			const room = roomManager.addClient(roomId, socket.id, sanitizedUsername);
+			const room = roomManager.addClient(
+			roomId,
+			socket.id,
+			sanitizedUsername,
+			socket.user?.id,
+			socket.user?.email
+		);
 			logger.info(`[Join] Room ${roomId} now has ${room.clients.size} clients`);
 
 			const clients = roomManager.getClients(roomId);

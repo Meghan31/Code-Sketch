@@ -3,13 +3,13 @@
 	"version": "1.0.0",
 	"type": "module",
 	"scripts": {
-		"start": "node backend/index.js",
-		"dev:server": "nodemon backend/index.js",
-		"dev:frontend": "cd frontend && npm run dev",
-		"dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
-		"install:all": "npm install && cd frontend && npm install"
+		"start": "node index.js",
+		"dev": "nodemon index.js"
 	},
 	"dependencies": {
+		"@supabase/supabase-js": "^2.81.1",
+		"cors": "^2.8.5",
+		"dotenv": "^17.2.3",
 		"express": "^4.21.2",
 		"joi": "^18.0.1",
 		"rate-limiter-flexible": "^8.1.0",

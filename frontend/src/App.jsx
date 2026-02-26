@@ -1,42 +1,3 @@
-// import { Toaster } from 'react-hot-toast';
-// import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-// import EditorPage from './pages/code-editor/EditorPage.jsx';
-// import Home from './pages/home/Home.jsx';
-
-// function App() {
-// 	return (
-// 		<>
-// 			<div>
-// 				<Toaster
-// 					position="top-right"
-// 					toastOptions={{
-// 						success: {
-// 							style: {
-// 								backgroundColor: '#4caf50',
-// 								color: '#fff',
-// 							},
-// 						},
-// 						error: {
-// 							style: {
-// 								backgroundColor: '#f44336',
-// 								color: '#fff',
-// 							},
-// 						},
-// 					}}
-// 				></Toaster>
-// 			</div>
-// 			<Router>
-// 				<Routes>
-// 					<Route path="/" element={<Home />}></Route>
-// 					<Route path="/editor/:roomId" element={<EditorPage />}></Route>
-// 				</Routes>
-// 			</Router>
-// 		</>
-// 	);
-// }
-
-// export default App;
-
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { Toaster } from 'react-hot-toast';
@@ -46,8 +7,11 @@ import {
 	BrowserRouter as Router,
 	Routes,
 } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
 import EditorPage from './pages/code-editor/EditorPage.jsx';
 import Home from './pages/home/Home.jsx';
+import Login from './pages/login/Login.jsx';
 
 // Error Boundary Component
 class ErrorBoundary extends Component {
@@ -108,36 +72,52 @@ ErrorBoundary.propTypes = {
 	children: PropTypes.node,
 };
 
-// function App() {
 function App() {
 	return (
 		<ErrorBoundary>
-			<Toaster
-				position="top-right"
-				toastOptions={{
-					success: {
-						style: {
-							backgroundColor: '#4caf50',
-							color: '#fff',
+			<AuthProvider>
+				<Toaster
+					position="top-right"
+					toastOptions={{
+						success: {
+							style: {
+								backgroundColor: '#4caf50',
+								color: '#fff',
+							},
+							duration: 3000,
 						},
-						duration: 3000,
-					},
-					error: {
-						style: {
-							backgroundColor: '#f44336',
-							color: '#fff',
+						error: {
+							style: {
+								backgroundColor: '#f44336',
+								color: '#fff',
+							},
+							duration: 4000,
 						},
-						duration: 4000,
-					},
-				}}
-			/>
-			<Router>
-				<Routes>
-					<Route path="/" element={<Home />} />
-					<Route path="/editor/:roomId" element={<EditorPage />} />
-					<Route path="*" element={<Navigate to="/" replace />} />
-				</Routes>
-			</Router>
+					}}
+				/>
+				<Router>
+					<Routes>
+						<Route path="/login" element={<Login />} />
+						<Route
+							path="/"
+							element={
+								<ProtectedRoute>
+									<Home />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/editor/:roomId"
+							element={
+								<ProtectedRoute>
+									<EditorPage />
+								</ProtectedRoute>
+							}
+						/>
+						<Route path="*" element={<Navigate to="/" replace />} />
+					</Routes>
+				</Router>
+			</AuthProvider>
 		</ErrorBoundary>
 	);
 }

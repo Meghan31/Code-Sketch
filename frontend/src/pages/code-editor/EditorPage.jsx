@@ -40,11 +40,17 @@ const EditorPage = () => {
 
 		const init = async () => {
 			// Initialize socket connection
-			socketRef.current = initSocket();
+			socketRef.current = await initSocket();
 
-			// Define error handler
+			// Define error handler — disconnect immediately to stop retry loop
 			const handleErrors = (e) => {
 				console.error('Socket error:', e);
+				if (socketRef.current) {
+					socketRef.current.off('connect_error', handleErrors);
+					socketRef.current.off('connect_failed', handleErrors);
+					socketRef.current.disconnect();
+					socketRef.current = null;
+				}
 				toast.error('Socket connection failed, try again later.');
 				navigate('/');
 			};
@@ -88,7 +94,11 @@ const EditorPage = () => {
 			socketRef.current.on(ACTIONS.LEFT, handleUserLeft);
 		};
 
-		init();
+		init().catch((e) => {
+			console.error('Failed to initialize socket:', e);
+			toast.error('Authentication failed. Please sign in again.');
+			navigate('/');
+		});
 
 		// Cleanup function
 		return () => {

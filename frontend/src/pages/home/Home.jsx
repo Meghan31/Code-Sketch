@@ -1,15 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router';
 import { v4 } from 'uuid';
-import { initSocket } from '../../socket/socket.js';
+import { useAuth } from '../../context/AuthContext';
 import './Home.scss';
 
 const Home = () => {
 	const navigate = useNavigate();
+	const { user, signOut } = useAuth();
 	const [roomId, setRoomId] = useState('');
-	const [username, setUsername] = useState('');
+	const [username, setUsername] = useState(
+		user?.user_metadata?.full_name || user?.email || ''
+	);
 	const [isJoining, setIsJoining] = useState(false);
+
+	// Clear active room data when coming to home page
+	// This prevents duplicate connections and redirect loops
+	useEffect(() => {
+		// Disconnect any existing socket connection
+		if (window.__codeSketchSocket) {
+			console.log('Disconnecting existing socket from home page');
+			window.__codeSketchSocket.disconnect();
+			window.__codeSketchSocket = null;
+			window.__codeSketchRoomId = null;
+		}
+
+		// Clear active room from localStorage when user visits home page
+		// This ensures clean state for new room joins
+		localStorage.removeItem('activeRoom');
+		localStorage.removeItem('activeUsername');
+	}, []);
 
 	// UUID validation helper
 	const isValidUUID = (uuid) => {
@@ -21,8 +41,15 @@ const Home = () => {
 	// Create a new room with UUID
 	const createRoom = (e) => {
 		e.preventDefault();
+
+		// Validate username before creating
+		if (!username || username.trim().length < 2) {
+			toast.error('Please enter your name (at least 2 characters)');
+			return;
+		}
+
 		const id = v4();
-		setRoomId(id);
+		const trimmedUsername = username.trim();
 
 		// Try to copy to clipboard
 		navigator.clipboard
@@ -34,6 +61,13 @@ const Home = () => {
 				console.error('Failed to copy text: ', err);
 				toast.error('Room ID created but could not copy to clipboard');
 			});
+
+		// Navigate to the new room immediately
+		navigate(`/editor/${id}`, {
+			state: {
+				username: trimmedUsername,
+			},
+		});
 	};
 
 	// Join an existing room
@@ -81,52 +115,37 @@ const Home = () => {
 
 		setIsJoining(true);
 
-		let socket = null;
-
 		try {
-			// Try to initialize a socket connection to verify server is reachable
-			socket = initSocket();
+			// Check if room exists on the server
+			const BACKEND_URL =
+				import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+			const response = await fetch(
+				`${BACKEND_URL}/room/${trimmedRoomId}/exists`
+			);
 
-			// Wait for connection or timeout after 5 seconds
-			const connectionPromise = new Promise((resolve, reject) => {
-				const timeout = setTimeout(() => {
-					reject(new Error('Connection timeout'));
-				}, 5000);
+			if (!response.ok) {
+				throw new Error('Failed to validate room');
+			}
 
-				socket.on('connect', () => {
-					clearTimeout(timeout);
-					resolve();
-				});
+			const data = await response.json();
 
-				socket.on('connect_error', (error) => {
-					clearTimeout(timeout);
-					reject(error);
-				});
+			if (!data.exists) {
+				toast.error(
+					'Room does not exist. Please check the Room ID or create a new room.'
+				);
+				setIsJoining(false);
+				return;
+			}
 
-				socket.on('connect_timeout', () => {
-					clearTimeout(timeout);
-					reject(new Error('Connection timeout'));
-				});
-			});
-
-			await connectionPromise;
-
-			// If we reach here, connection was successful
-			// Navigate to editor page
+			// Navigate to editor page if room exists
 			navigate(`/editor/${trimmedRoomId}`, {
 				state: {
 					username: trimmedUsername,
 				},
 			});
 		} catch (error) {
-			console.error('Connection error:', error);
-			toast.error('Could not connect to server. Please try again later.');
-		} finally {
-			// ALWAYS disconnect and cleanup the test socket
-			if (socket) {
-				socket.removeAllListeners();
-				socket.disconnect();
-			}
+			console.error('Error validating room:', error);
+			toast.error('Failed to validate room. Please try again.');
 			setIsJoining(false);
 		}
 	};
@@ -138,8 +157,31 @@ const Home = () => {
 		}
 	};
 
+	// Handle logout
+	const handleLogout = async () => {
+		// Clear active room on logout
+		localStorage.removeItem('activeRoom');
+		localStorage.removeItem('activeUsername');
+		await signOut();
+	};
+
 	return (
 		<div className="homePageWrapper">
+			<div className="userInfoBar">
+				<div className="userInfo">
+					{user?.user_metadata?.avatar_url && (
+						<img
+							src={user.user_metadata.avatar_url}
+							alt="Profile"
+							className="userAvatar"
+						/>
+					)}
+					<span className="userEmail">{user?.email}</span>
+				</div>
+				<button className="logoutBtn" onClick={handleLogout}>
+					Sign Out
+				</button>
+			</div>
 			<div className="formWrapper">
 				<h1>CodeSketch</h1>
 				<p>Real-time collaborative code editor</p>

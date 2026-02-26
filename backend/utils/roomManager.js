@@ -13,7 +13,11 @@ class RoomManager {
 		this.startCleanupInterval();
 	}
 
-	getOrCreateRoom(roomId) {
+	roomExists(roomId) {
+		return this.rooms.has(roomId);
+	}
+
+	getOrCreateRoom(roomId, creatorUserId = null, creatorEmail = null) {
 		if (!this.rooms.has(roomId)) {
 			if (this.rooms.size >= this.MAX_ROOMS) {
 				throw new Error(`Maximum number of rooms (${this.MAX_ROOMS}) reached`);
@@ -23,14 +27,25 @@ class RoomManager {
 				clients: new Map(),
 				code: '',
 				language: 'cpp',
-				stdin: '', // Add stdin storage
-				output: '', // Add output storage
-				isError: false, // Add error state
+				stdin: '',
+				output: '',
+				isError: false,
 				createdAt: Date.now(),
+				createdBy: creatorUserId,
+				creatorEmail: creatorEmail,
+				participants: new Set(),
 			});
 			this.updateActivity(roomId);
-			logger.info(`Room created: ${roomId}`);
+			logger.info(
+				`Room created: ${roomId} by ${creatorEmail || 'unknown'} (${
+					creatorUserId || 'N/A'
+				})`
+			);
 		}
+		return this.rooms.get(roomId);
+	}
+
+	getRoom(roomId) {
 		return this.rooms.get(roomId);
 	}
 
@@ -38,8 +53,8 @@ class RoomManager {
 		this.roomActivity.set(roomId, Date.now());
 	}
 
-	addClient(roomId, socketId, username) {
-		const room = this.getOrCreateRoom(roomId);
+	addClient(roomId, socketId, username, userId = null, userEmail = null) {
+		const room = this.getOrCreateRoom(roomId, userId, userEmail);
 
 		if (room.clients.size >= this.MAX_CLIENTS_PER_ROOM) {
 			throw new Error(
@@ -47,9 +62,17 @@ class RoomManager {
 			);
 		}
 
-		room.clients.set(socketId, username);
+		room.clients.set(socketId, { username, userId, userEmail });
+
+		// Track participant
+		if (userId) {
+			room.participants.add(userId);
+		}
+
 		this.updateActivity(roomId);
-		logger.info(`Client ${username} (${socketId}) joined room ${roomId}`);
+		logger.info(
+			`Client ${username} (${userEmail || 'no-email'}) joined room ${roomId}`
+		);
 		return room;
 	}
 
@@ -57,7 +80,7 @@ class RoomManager {
 		if (!this.rooms.has(roomId)) return null;
 
 		const room = this.rooms.get(roomId);
-		const username = room.clients.get(socketId);
+		const clientData = room.clients.get(socketId);
 		room.clients.delete(socketId);
 
 		if (room.clients.size === 0) {
@@ -68,7 +91,7 @@ class RoomManager {
 		}
 
 		this.updateActivity(roomId);
-		return { room, username };
+		return { room, username: clientData?.username || 'Unknown' };
 	}
 
 	updateCode(roomId, code) {
@@ -108,10 +131,26 @@ class RoomManager {
 		const room = this.rooms.get(roomId);
 		if (!room) return [];
 
-		return Array.from(room.clients, ([id, name]) => ({
+		return Array.from(room.clients, ([id, data]) => ({
 			socketId: id,
-			username: name,
+			username: typeof data === 'string' ? data : data.username,
+			userId: typeof data === 'object' ? data.userId : null,
+			userEmail: typeof data === 'object' ? data.userEmail : null,
 		}));
+	}
+
+	getRoomInfo(roomId) {
+		const room = this.rooms.get(roomId);
+		if (!room) return null;
+
+		return {
+			roomId,
+			createdBy: room.createdBy,
+			creatorEmail: room.creatorEmail,
+			createdAt: room.createdAt,
+			participants: Array.from(room.participants),
+			activeClients: room.clients.size,
+		};
 	}
 
 	cleanupInactiveRooms() {
