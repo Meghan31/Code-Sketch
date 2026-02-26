@@ -1,16 +1,19 @@
 import { logger } from './logger.js';
 
-class RoomManager {
-	constructor() {
+export class RoomManager {
+	constructor(options = {}) {
 		this.rooms = new Map();
 		this.roomActivity = new Map();
-		this.ROOM_TTL = 3600000; // 1 hour in milliseconds
-		this.CLEANUP_INTERVAL = 300000; // 5 minutes
+		this.ROOM_TTL = options.roomTTL ?? 3600000; // 1 hour in milliseconds
+		this.CLEANUP_INTERVAL = options.cleanupInterval ?? 300000; // 5 minutes
 		this.cleanupIntervalId = null;
-		this.MAX_ROOMS = 1000;
-		this.MAX_CLIENTS_PER_ROOM = 50;
+		this.MAX_ROOMS = options.maxRooms ?? 1000;
+		this.MAX_CLIENTS_PER_ROOM = options.maxClientsPerRoom ?? 50;
+		this.autoStartCleanup = options.autoStartCleanup ?? true;
 
-		this.startCleanupInterval();
+		if (this.autoStartCleanup) {
+			this.startCleanupInterval();
+		}
 	}
 
 	roomExists(roomId) {
@@ -39,7 +42,7 @@ class RoomManager {
 			logger.info(
 				`Room created: ${roomId} by ${creatorEmail || 'unknown'} (${
 					creatorUserId || 'N/A'
-				})`
+				})`,
 			);
 		}
 		return this.rooms.get(roomId);
@@ -58,7 +61,7 @@ class RoomManager {
 
 		if (room.clients.size >= this.MAX_CLIENTS_PER_ROOM) {
 			throw new Error(
-				`Room is full (max ${this.MAX_CLIENTS_PER_ROOM} clients)`
+				`Room is full (max ${this.MAX_CLIENTS_PER_ROOM} clients)`,
 			);
 		}
 
@@ -71,7 +74,7 @@ class RoomManager {
 
 		this.updateActivity(roomId);
 		logger.info(
-			`Client ${username} (${userEmail || 'no-email'}) joined room ${roomId}`
+			`Client ${username} (${userEmail || 'no-email'}) joined room ${roomId}`,
 		);
 		return room;
 	}
@@ -165,7 +168,7 @@ class RoomManager {
 				logger.info(
 					`Room ${roomId} cleaned up (inactive for ${
 						this.ROOM_TTL / 60000
-					} minutes)`
+					} minutes)`,
 				);
 			}
 		});
@@ -178,6 +181,9 @@ class RoomManager {
 	}
 
 	startCleanupInterval() {
+		if (!this.autoStartCleanup || this.cleanupIntervalId) {
+			return;
+		}
 		this.cleanupIntervalId = setInterval(() => {
 			this.cleanupInactiveRooms();
 		}, this.CLEANUP_INTERVAL);
@@ -190,7 +196,7 @@ class RoomManager {
 			totalRooms: this.rooms.size,
 			totalClients: Array.from(this.rooms.values()).reduce(
 				(sum, room) => sum + room.clients.size,
-				0
+				0,
 			),
 		};
 	}
