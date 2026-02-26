@@ -45,7 +45,6 @@ npm install
 ```
 
 3. **Setup Supabase Database**
-
    - Go to your Supabase SQL Editor
    - Run the SQL script in `supabase-setup.sql`
 
@@ -72,7 +71,6 @@ SUPABASE_SERVICE_KEY=your_service_role_key_here
 ```
 
 5. **Configure Redirect URLs in Supabase**
-
    - Go to Authentication → URL Configuration
    - Add: `http://localhost:5173/` and `http://localhost:5173/editor/*`
 
