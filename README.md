@@ -1,5 +1,10 @@
 # CodeSketch
 
+![Adobe Express - Screen Recording 2026-02-26 at 2 32 23 AM](https://github.com/user-attachments/assets/a03a4694-7c0c-4251-b8a7-59e23c971382)
+
+
+
+
 Real-time collaborative code editor with Google OAuth authentication built with React, Node.js, and Supabase.
 
 ## ✨ Features
