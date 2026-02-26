@@ -1,0 +1,139 @@
+@use './variables.scss';
+
+/* ─── Reset ─── */
+*,
+*::before,
+*::after {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html {
+	font-size: 16px;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+body {
+	font-family: var(--font-sans);
+	background-color: var(--bg-primary);
+	color: var(--text-primary);
+	line-height: 1.5;
+	overflow-x: hidden;
+}
+
+#root {
+	max-width: none;
+	margin: 0;
+	padding: 0;
+	text-align: left;
+	min-height: 100vh;
+}
+
+/* ─── Typography ─── */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	line-height: 1.2;
+}
+
+a {
+	color: var(--accent-blue);
+	text-decoration: none;
+	transition: color var(--transition-fast);
+
+	&:hover {
+		color: var(--accent-blue-hover);
+	}
+}
+
+code,
+pre,
+kbd {
+	font-family: var(--font-mono);
+}
+
+/* ─── Scrollbars ─── */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--border-hover);
+	border-radius: var(--radius-full);
+
+	&:hover {
+		background: var(--text-muted);
+	}
+}
+
+/* Firefox */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-hover) transparent;
+}
+
+/* ─── Focus Ring ─── */
+:focus-visible {
+	outline: 2px solid var(--accent-blue);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+/* ─── Selection ─── */
+::selection {
+	background: rgba(59, 130, 246, 0.3);
+	color: var(--text-primary);
+}
+
+/* ─── Button Reset ─── */
+button {
+	font-family: var(--font-sans);
+	cursor: pointer;
+	border: none;
+	background: none;
+	color: inherit;
+	font-size: inherit;
+}
+
+/* ─── Input Reset ─── */
+input,
+select,
+textarea {
+	font-family: var(--font-sans);
+	font-size: var(--text-sm);
+	color: var(--text-primary);
+	background: transparent;
+	border: none;
+	outline: none;
+}
+
+/* ─── Utility ─── */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+
+/* ─── Toaster overrides ─── */
+[data-sonner-toaster] {
+	font-family: var(--font-sans) !important;
+}

@@ -1,5 +1,5 @@
-import 'dotenv/config';
 import cors from 'cors';
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
@@ -66,6 +66,112 @@ app.get('/room/:roomId/exists', (req, res) => {
 	res.json({ exists });
 });
 
+// ── Code execution proxy (Judge0 CE) ──
+const executeRateLimiter = new RateLimiterMemory({ points: 10, duration: 60 });
+
+const JUDGE0_URL = process.env.JUDGE0_URL || 'https://ce.judge0.com';
+
+// Map language names → Judge0 language IDs
+const JUDGE0_LANG_IDS = {
+	cpp: 54, // C++ (GCC 9.2.0)
+	c: 50, // C   (GCC 9.2.0)
+	javascript: 93, // JavaScript (Node.js 18.15.0)
+	java: 91, // Java (JDK 17.0.6)
+	python: 100, // Python (3.12.5)
+};
+
+app.post('/execute', async (req, res) => {
+	try {
+		const clientIp =
+			req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+			req.socket.remoteAddress;
+		await executeRateLimiter.consume(clientIp);
+
+		const { language, files, stdin } = req.body;
+
+		if (!language || !Array.isArray(files) || files.length === 0) {
+			return res.status(400).json({ error: 'Invalid request body' });
+		}
+
+		const languageId = JUDGE0_LANG_IDS[language];
+		if (!languageId) {
+			return res
+				.status(400)
+				.json({ error: `Unsupported language: ${language}` });
+		}
+
+		const sourceCode = files[0].content || '';
+
+		logger.info(
+			`[Execute] Sending to Judge0: langId=${languageId}, codeLength=${sourceCode.length}`,
+		);
+
+		// Submit with ?wait=true so Judge0 returns the result synchronously
+		const judge0Res = await fetch(
+			`${JUDGE0_URL}/submissions?base64_encoded=false&wait=true`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					language_id: languageId,
+					source_code: sourceCode,
+					stdin: stdin || '',
+				}),
+				signal: AbortSignal.timeout(30000),
+			},
+		);
+
+		if (!judge0Res.ok) {
+			const errText = await judge0Res.text().catch(() => 'Unknown error');
+			logger.error(`[Execute] Judge0 returned ${judge0Res.status}: ${errText}`);
+			return res
+				.status(judge0Res.status === 429 ? 429 : 502)
+				.json({ error: 'Code execution service error', detail: errText });
+		}
+
+		const data = await judge0Res.json();
+
+		// Judge0 response → Piston-compatible format the frontend expects
+		const stdout = data.stdout || '';
+		const stderr = data.stderr || '';
+		const compileOut = data.compile_output || '';
+		const statusDesc = data.status?.description || '';
+		const exitCode =
+			statusDesc === 'Accepted' ? 0 : data.status?.id >= 6 ? 1 : 0;
+
+		// Combine compile errors + runtime errors
+		const fullStderr = [compileOut, stderr].filter(Boolean).join('\n').trim();
+		const output =
+			stdout || fullStderr || (statusDesc !== 'Accepted' ? statusDesc : '');
+
+		const pistonCompatible = {
+			run: {
+				stdout,
+				stderr: fullStderr,
+				code: exitCode,
+				output: output || 'No output',
+			},
+		};
+
+		logger.info(
+			`[Execute] Done: status=${statusDesc}, outputLen=${output.length}`,
+		);
+		res.json(pistonCompatible);
+	} catch (error) {
+		if (error?.message?.includes('rate')) {
+			return res.status(429).json({ error: 'Rate limit exceeded' });
+		}
+		if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+			logger.error('[Execute] Judge0 request timed out');
+			return res
+				.status(504)
+				.json({ error: 'Code execution timed out (30s limit)' });
+		}
+		logger.error('[Execute] Error:', error);
+		res.status(500).json({ error: 'Code execution failed' });
+	}
+});
+
 app.get('/health', (req, res) => {
 	const stats = roomManager.getStats();
 	res.json({
@@ -97,7 +203,7 @@ codesketch_clients_total ${stats.totalClients}
 # HELP codesketch_uptime_seconds Server uptime in seconds
 # TYPE codesketch_uptime_seconds counter
 codesketch_uptime_seconds ${Math.floor(process.uptime())}
-	`.trim()
+	`.trim(),
 	);
 });
 
@@ -120,7 +226,7 @@ io.on('connection', (socket) => {
 
 			if (currentRoom) {
 				logger.info(
-					`[Join] User ${socket.id} leaving previous room ${currentRoom}`
+					`[Join] User ${socket.id} leaving previous room ${currentRoom}`,
 				);
 				socket.leave(currentRoom);
 				const result = roomManager.removeClient(currentRoom, socket.id);
@@ -136,17 +242,17 @@ io.on('connection', (socket) => {
 			currentUser = sanitizedUsername;
 
 			logger.info(
-				`[Join] User ${sanitizedUsername} (${socket.id}) joining room ${roomId}`
+				`[Join] User ${sanitizedUsername} (${socket.id}) joining room ${roomId}`,
 			);
 			socket.join(roomId);
 
 			const room = roomManager.addClient(
-			roomId,
-			socket.id,
-			sanitizedUsername,
-			socket.user?.id,
-			socket.user?.email
-		);
+				roomId,
+				socket.id,
+				sanitizedUsername,
+				socket.user?.id,
+				socket.user?.email,
+			);
 			logger.info(`[Join] Room ${roomId} now has ${room.clients.size} clients`);
 
 			const clients = roomManager.getClients(roomId);
@@ -179,7 +285,7 @@ io.on('connection', (socket) => {
 			socket.emit('syncCode', syncData);
 
 			logger.info(
-				`[Join] Successfully synced state to ${sanitizedUsername} in room ${roomId}`
+				`[Join] Successfully synced state to ${sanitizedUsername} in room ${roomId}`,
 			);
 		} catch (error) {
 			logger.error(`[Join] Error:`, error);
@@ -194,7 +300,7 @@ io.on('connection', (socket) => {
 			const { roomId, code } = validate(schemas.codeChange, data);
 
 			logger.debug(
-				`[CodeChange] Updating code in room ${roomId}, length: ${code.length}`
+				`[CodeChange] Updating code in room ${roomId}, length: ${code.length}`,
 			);
 			roomManager.updateCode(roomId, code);
 
@@ -215,7 +321,7 @@ io.on('connection', (socket) => {
 			const { roomId, language } = validate(schemas.languageChange, data);
 
 			logger.info(
-				`[LanguageChange] Changing language to ${language} in room ${roomId}`
+				`[LanguageChange] Changing language to ${language} in room ${roomId}`,
 			);
 			roomManager.updateLanguage(roomId, language);
 
@@ -223,7 +329,7 @@ io.on('connection', (socket) => {
 			socket.to(roomId).emit('languageChanged', { language });
 
 			logger.info(
-				`[LanguageChange] Language change broadcasted to room ${roomId}`
+				`[LanguageChange] Language change broadcasted to room ${roomId}`,
 			);
 		} catch (error) {
 			logger.error(`[LanguageChange] Error:`, error);
@@ -241,13 +347,13 @@ io.on('connection', (socket) => {
 			const { roomId, stdin } = validate(schemas.inputChange, data);
 
 			logger.info(
-				`[InputChange] Updating input in room ${roomId}, length: ${stdin.length}`
+				`[InputChange] Updating input in room ${roomId}, length: ${stdin.length}`,
 			);
 			roomManager.updateInput(roomId, stdin);
 
 			// Broadcast to OTHER users only (sender already has the change)
 			logger.info(
-				`[InputChange] Broadcasting inputChanged to other users in room ${roomId}`
+				`[InputChange] Broadcasting inputChanged to other users in room ${roomId}`,
 			);
 			socket.to(roomId).emit('inputChanged', { stdin });
 
@@ -268,26 +374,26 @@ io.on('connection', (socket) => {
 					language: data.language,
 					codeLength: data.code?.length || 0,
 					stdinLength: data.stdin?.length || 0,
-				}
+				},
 			);
 
 			await rateLimiters.executeCode.consume(getClientIdentifier(socket));
 
 			const { roomId, code, language, stdin } = validate(
 				schemas.executeCode,
-				data
+				data,
 			);
 
 			// Broadcast to ALL users in room (including sender)
 			logger.info(
-				`[ExecuteCode] Broadcasting executionStarted to ALL users in room ${roomId}`
+				`[ExecuteCode] Broadcasting executionStarted to ALL users in room ${roomId}`,
 			);
 			io.to(roomId).emit('executionStarted', {
 				username: currentUser,
 			});
 
 			logger.info(
-				`[ExecuteCode] Execution started by ${currentUser} in room ${roomId}`
+				`[ExecuteCode] Execution started by ${currentUser} in room ${roomId}`,
 			);
 		} catch (error) {
 			logger.error(`[ExecuteCode] Error:`, error);
@@ -304,7 +410,7 @@ io.on('connection', (socket) => {
 					roomId: data.roomId,
 					outputLength: data.output?.length || 0,
 					isError: data.isError,
-				}
+				},
 			);
 
 			const { roomId, output, isError } = data;
@@ -319,7 +425,7 @@ io.on('connection', (socket) => {
 
 			// Broadcast to ALL users in room (including sender for consistency)
 			logger.info(
-				`[ExecutionResult] Broadcasting to ALL users in room ${roomId}`
+				`[ExecutionResult] Broadcasting to ALL users in room ${roomId}`,
 			);
 			io.to(roomId).emit('executionResult', {
 				output,
@@ -328,7 +434,7 @@ io.on('connection', (socket) => {
 			});
 
 			logger.info(
-				`[ExecutionResult] Successfully broadcasted execution result in room ${roomId}`
+				`[ExecutionResult] Successfully broadcasted execution result in room ${roomId}`,
 			);
 		} catch (error) {
 			logger.error(`[ExecutionResult] Error:`, error);
@@ -347,7 +453,7 @@ io.on('connection', (socket) => {
 					username: currentUser,
 				});
 				logger.info(
-					`[Disconnect] User ${currentUser} left room ${currentRoom}`
+					`[Disconnect] User ${currentUser} left room ${currentRoom}`,
 				);
 			}
 		}

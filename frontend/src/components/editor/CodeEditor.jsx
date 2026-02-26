@@ -1,9 +1,19 @@
 import Editor from '@monaco-editor/react';
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { registerCodesketchTheme } from '../../config/monacoTheme';
 import ACTIONS from '../../socket/actions';
 import Output from '../output/Output';
+import { KbdShortcut } from '../ui/Kbd';
 import './CodeEditor.scss';
+
+const LANGUAGE_OPTIONS = [
+	{ value: 'cpp', label: 'C++' },
+	{ value: 'c', label: 'C' },
+	{ value: 'javascript', label: 'JavaScript' },
+	{ value: 'java', label: 'Java' },
+	{ value: 'python', label: 'Python' },
+];
 
 const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 	const [code, setCode] = useState('// Write your code here');
@@ -55,12 +65,10 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 	const handleCodeChange = useCallback(
 		(newCode) => {
 			if (newCode === code) return;
-
 			setCode(newCode);
 			if (onCodeChange) {
 				onCodeChange(newCode);
 			}
-
 			if (socketRef.current) {
 				socketRef.current.emit(ACTIONS.CODE_CHANGE, {
 					roomId,
@@ -68,10 +76,12 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 				});
 			}
 		},
-		[code, onCodeChange, roomId, socketRef]
+		[code, onCodeChange, roomId, socketRef],
 	);
 
-	const onMount = (editor) => {
+	const onMount = (editor, monaco) => {
+		registerCodesketchTheme(monaco);
+		monaco.editor.setTheme('codesketch');
 		editorRef.current = editor;
 		editor.focus();
 	};
@@ -79,7 +89,6 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 	const handleLanguageChange = (e) => {
 		const newLanguage = e.target.value;
 		setLanguage(newLanguage);
-
 		if (socketRef.current) {
 			socketRef.current.emit(ACTIONS.LANGUAGE_CHANGE, {
 				roomId,
@@ -89,24 +98,28 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 	};
 
 	return (
-		<div className="main-block">
-			<div className="prog-language">
+		<div className="code-editor">
+			<div className="code-editor__toolbar">
 				<select
-					className="language"
+					className="code-editor__language"
 					value={language}
 					onChange={handleLanguageChange}
 				>
-					<option value="cpp">C++</option>
-					<option value="c">C</option>
-					<option value="javascript">Javascript</option>
-					<option value="java">Java</option>
-					<option value="python">Python</option>
+					{LANGUAGE_OPTIONS.map((opt) => (
+						<option key={opt.value} value={opt.value}>
+							{opt.label}
+						</option>
+					))}
 				</select>
+				<div className="code-editor__hint">
+					<span>Run</span>
+					<KbdShortcut keys={['Ctrl', 'Enter']} />
+				</div>
 			</div>
-			<div className="code-block">
-				<div className="editor">
+			<div className="code-editor__split">
+				<div className="code-editor__editor">
 					<Editor
-						height="40vh"
+						height="100%"
 						language={language}
 						value={code}
 						onChange={handleCodeChange}
@@ -115,17 +128,28 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange }) => {
 						options={{
 							minimap: { enabled: false },
 							showUnused: false,
-							folding: false,
+							folding: true,
 							lineNumbersMinChars: 3,
-							fontSize: 16,
+							fontSize: 14,
+							fontFamily: "'JetBrains Mono', monospace",
+							fontLigatures: true,
 							scrollBeyondLastLine: false,
 							automaticLayout: true,
+							bracketPairColorization: { enabled: true },
+							cursorSmoothCaretAnimation: 'on',
+							cursorBlinking: 'smooth',
+							padding: { top: 12, bottom: 12 },
+							renderLineHighlight: 'line',
+							scrollbar: {
+								verticalScrollbarSize: 6,
+								horizontalScrollbarSize: 6,
+							},
 						}}
 					/>
 				</div>
-				<Output 
-					editorRef={editorRef} 
-					language={language} 
+				<Output
+					editorRef={editorRef}
+					language={language}
 					socketRef={socketRef}
 					roomId={roomId}
 				/>

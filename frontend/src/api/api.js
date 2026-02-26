@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { LANGUAGE_VERSIONS } from './constant';
 
+const BACKEND_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+
 const API = axios.create({
-	baseURL: 'https://emkc.org/api/v2/piston',
+	baseURL: BACKEND_URL,
 	timeout: 15000, // 15 second timeout
 	headers: {
 		'Content-Type': 'application/json',
@@ -21,7 +23,7 @@ API.interceptors.response.use(
 			console.error('Network error - please check your connection');
 		}
 		return Promise.reject(error);
-	}
+	},
 );
 
 export const executeCode = async (sourceCode, language, stdin = '') => {
@@ -39,13 +41,9 @@ export const executeCode = async (sourceCode, language, stdin = '') => {
 		const inputString = typeof stdin === 'string' ? stdin : String(stdin || '');
 
 		const response = await API.post('/execute', {
-			language: language,
+			language,
 			version: LANGUAGE_VERSIONS[language],
-			files: [
-				{
-					content: sourceCode,
-				},
-			],
+			files: [{ content: sourceCode }],
 			stdin: inputString,
 		});
 
