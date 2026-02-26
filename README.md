@@ -54,7 +54,7 @@ npm install
 Create `frontend/.env`:
 
 ```env
-VITE_SUPABASE_URL=https://dhxiigadchkjiyoljnpi.supabase.co
+VITE_SUPABASE_URL=https://dhxiixxxxxxxxyoljnpi.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
 VITE_SOCKET_URL=http://localhost:3000
 ```
@@ -67,7 +67,7 @@ HOST=0.0.0.0
 NODE_ENV=development
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 
-SUPABASE_URL=https://dhxiigadchkjiyoljnpi.supabase.co
+SUPABASE_URL=https://dhxiixxxxxxxxyoljnpi.supabase.co
 SUPABASE_SERVICE_KEY=your_service_role_key_here
 ```
 
