@@ -60,7 +60,7 @@ describe('Home page', () => {
 			value: { writeText: vi.fn().mockResolvedValue(undefined) },
 		});
 		// Mock fetch (not called unless joinRoom is triggered with a UUID)
-		global.fetch = vi.fn();
+		globalThis.fetch = vi.fn();
 	});
 
 	it("displays the user's email in the header", () => {
@@ -153,7 +153,7 @@ describe('Home page', () => {
 
 	it('navigates to editor when joining a valid, existing room', async () => {
 		const user = userEvent.setup();
-		global.fetch = vi.fn().mockResolvedValue({
+		globalThis.fetch = vi.fn().mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve({ exists: true }),
 		});
@@ -173,7 +173,7 @@ describe('Home page', () => {
 
 	it('shows an error toast when the room does not exist', async () => {
 		const user = userEvent.setup();
-		global.fetch = vi.fn().mockResolvedValue({
+		globalThis.fetch = vi.fn().mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve({ exists: false }),
 		});
